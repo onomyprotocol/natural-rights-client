@@ -1,6 +1,6 @@
 {
   "name": "@natural-rights/client",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Natural Rights Client Library",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",

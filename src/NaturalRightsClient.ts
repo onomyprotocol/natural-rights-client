@@ -592,6 +592,34 @@ export class NaturalRightsClient {
   }
 
   /**
+   * Sign an array of pre-hashed values on a document in natural rights
+   *
+   * @param documentId unique identifier of the document to sign texts on
+   * @param hashes array of hashes to sign
+   * @returns a corresponding array of signatures
+   */
+  public async signDocumentHashes(
+    documentId: string,
+    hashes: readonly string[]
+  ): Promise<readonly string[]> {
+    const actions: readonly [NRSignDocumentAction] = [
+      {
+        payload: {
+          documentId,
+          hashes
+        },
+        type: 'SignDocument'
+      }
+    ]
+    const response = await this._requestActions(actions)
+    const result = response.results.find(({ type }) => type === 'SignDocument')
+    if (!result) {
+      throw new Error('No SignDocument result')
+    }
+    return (result as NRSignDocumentResult).payload.signatures
+  }
+
+  /**
    * Sign an array of texts on a document in natural rights
    *
    * @param documentId unique identifier of the document to sign texts on
@@ -605,7 +633,7 @@ export class NaturalRightsClient {
     const hashes = await Promise.all(
       textsToSign.map<Promise<string>>(hashForSignature)
     )
-    return this._signDocumentHashes(documentId, hashes)
+    return this.signDocumentHashes(documentId, hashes)
   }
 
   /**
@@ -737,27 +765,6 @@ export class NaturalRightsClient {
       encCryptPrivKey
     )
     return cryptPrivKey
-  }
-
-  protected async _signDocumentHashes(
-    documentId: string,
-    hashes: readonly string[]
-  ): Promise<readonly string[]> {
-    const actions: readonly [NRSignDocumentAction] = [
-      {
-        payload: {
-          documentId,
-          hashes
-        },
-        type: 'SignDocument'
-      }
-    ]
-    const response = await this._requestActions(actions)
-    const result = response.results.find(({ type }) => type === 'SignDocument')
-    if (!result) {
-      throw new Error('No SignDocument result')
-    }
-    return (result as NRSignDocumentResult).payload.signatures
   }
 
   protected async _getKeyPairs(
