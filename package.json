@@ -52,7 +52,7 @@
     "node": ">=8.9"
   },
   "dependencies": {
-    "@natural-rights/common": "git+ssh://git@gitlab.com/nodehaven/natural-rights-common.git#v0.0.6",
+    "@natural-rights/common": "git+ssh://git@gitlab.com/nodehaven/natural-rights-common.git#v0.0.7",
     "@notabug/gun-sear": "0.0.22",
     "@types/jest": "^24.0.18",
     "isomorphic-fetch": "^2.2.1",
