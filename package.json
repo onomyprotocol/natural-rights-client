@@ -17,9 +17,10 @@
     "fix": "run-s fix:*",
     "fix:prettier": "prettier \"src/**/*.ts\" --write",
     "fix:tslint": "tslint --fix --project .",
-    "test": "run-s build test:*",
-    "test:lint": "tslint --project . && prettier \"src/**/*.ts\" --list-different",
-    "test:unit": "nyc --silent ava",
+    "test": "run-s test:*",
+    "test:lint": "tslint --project .",
+    "test:unit": "jest --coverage",
+    "oldtest:unit": "nyc --silent ava",
     "watch": "run-s clean build:main && run-p \"build:main -- -w\" \"test:unit -- --watch\"",
     "cov": "run-s build test:unit cov:html && open-cli coverage/index.html",
     "cov:html": "nyc report --reporter=html",
@@ -53,7 +54,11 @@
   "dependencies": {
     "@natural-rights/common": "git+ssh://git@gitlab.com/nodehaven/natural-rights-common.git#v0.0.5",
     "@notabug/gun-sear": "0.0.22",
-    "isomorphic-fetch": "^2.2.1"
+    "@types/jest": "^24.0.18",
+    "isomorphic-fetch": "^2.2.1",
+    "jest": "^24.9.0",
+    "jest-config": "^24.9.0",
+    "ts-jest": "^24.1.0"
   },
   "devDependencies": {
     "@bitjson/npm-scripts-info": "^1.0.0",
@@ -87,6 +92,42 @@
     "commitizen": {
       "path": "cz-conventional-changelog"
     }
+  },
+  "jest": {
+    "transform": {
+      ".(ts|tsx)": "ts-jest"
+    },
+    "testEnvironment": "node",
+    "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/build/",
+      "/es/"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/test/"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 90,
+        "functions": 95,
+        "lines": 95,
+        "statements": 95
+      }
+    },
+    "collectCoverageFrom": [
+      "src/*.{js,ts}",
+      "src/actions/*.{js,ts}"
+    ],
+    "reporters": [
+      "default"
+    ]
   },
   "prettier": {
     "singleQuote": true,

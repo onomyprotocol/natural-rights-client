@@ -149,7 +149,7 @@ export class NaturalRightsClient {
           rootDocCryptPubKey: rootDocCryptKeyPair.pubKey,
           rootDocEncCryptPrivKey,
 
-          signPubKey: accountCryptKeyPair.pubKey,
+          signPubKey: accountSignKeyPair.pubKey,
 
           accountId: accountSignKeyPair.pubKey
         },
