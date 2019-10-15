@@ -610,7 +610,7 @@ describe('NaturalRightsClient', () => {
       const documentId = expectedSignKeyPair.pubKey
 
       // @ts-ignore
-      jest.spyOn(SEA, 'pair').mockResolvedValue({
+      const pairMock = jest.spyOn(SEA, 'pair').mockResolvedValue({
         epriv: expectedCryptKeyPair.privKey,
         epub: expectedCryptKeyPair.pubKey,
         priv: expectedSignKeyPair.privKey,
@@ -659,8 +659,7 @@ describe('NaturalRightsClient', () => {
           }
         ])
       } finally {
-        // @ts-ignore
-        SEA.pair.mockRestore()
+        pairMock.mockRestore()
       }
     })
   })

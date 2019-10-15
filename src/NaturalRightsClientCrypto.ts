@@ -1,4 +1,5 @@
 import {
+  NRAction,
   NRClientCrypto,
   NRKeyPair,
   PREPrimitivesInterface
@@ -19,38 +20,27 @@ export function makeClientCrypto(
     clientCryptPubKey: clientCryptKeyPair.pubKey,
     clientSignPubKey: clientSignKeyPair.pubKey,
 
-    createAccount: async () => {
-      const accountCryptKeyPair = await primitives.cryptKeyGen()
-      const accountSignKeyPair = await primitives.signKeyGen()
-
-      const accountEncCryptPrivKey = await clientCrypto.encryptKey(
-        accountCryptKeyPair.pubKey,
-        accountCryptKeyPair.privKey
-      )
-
-      const accountEncSignPrivKey = await clientCrypto.encryptKey(
-        accountCryptKeyPair.pubKey,
-        accountSignKeyPair.privKey
-      )
-
-      const {
-        clientCryptTransformKey
-      } = await clientCrypto.createClientAuthorization({
-        accountCryptPubKey: accountCryptKeyPair.pubKey,
-        accountEncCryptPrivKey,
-        clientCryptPubKey: clientCryptKeyPair.pubKey
-      })
-
+    /**
+     * Sign one or more NRAction's with this account or client
+     */
+    signRequest: async ({
+      actions
+    }: {
+      readonly actions: readonly NRAction[]
+    }) => {
+      const body = JSON.stringify(actions)
+      const signature = await primitives.sign(clientSignKeyPair, body)
       return {
-        accountCryptPubKey: accountCryptKeyPair.pubKey,
-        accountEncCryptPrivKey,
-        accountEncSignPrivKey,
-        accountSignPubKey: accountSignKeyPair.pubKey,
-        clientCryptTransformKey
+        body,
+        clientId: clientSignKeyPair.pubKey,
+        signature
       }
     },
 
-    createClientAuthorization: async ({
+    /**
+     * Authorize a client on an account
+     */
+    createClientAuth: async ({
       accountCryptPubKey,
       accountEncCryptPrivKey,
       clientCryptPubKey
@@ -62,7 +52,10 @@ export function makeClientCrypto(
       return {
         clientCryptTransformKey: await primitives.cryptTransformKeyGen(
           {
-            privKey: await clientCrypto.decryptKey(accountEncCryptPrivKey),
+            privKey: await primitives.decrypt(
+              clientCryptKeyPair,
+              accountEncCryptPrivKey
+            ),
             pubKey: accountCryptPubKey
           },
           clientCryptPubKey,
@@ -71,6 +64,38 @@ export function makeClientCrypto(
       }
     },
 
+    /**
+     * Return account credentials to register with service
+     *
+     * May go away after next refactor stage and can be ignored by companion
+     */
+    createAccount: async () => {
+      const accountCryptKeyPair = await primitives.cryptKeyGen()
+      const accountSignKeyPair = await primitives.signKeyGen()
+
+      const accountEncCryptPrivKey = await primitives.encrypt(
+        accountCryptKeyPair.pubKey,
+        accountCryptKeyPair.privKey,
+        clientSignKeyPair
+      )
+
+      const accountEncSignPrivKey = await primitives.encrypt(
+        accountCryptKeyPair.pubKey,
+        accountSignKeyPair.privKey,
+        clientSignKeyPair
+      )
+
+      return {
+        accountCryptPubKey: accountCryptKeyPair.pubKey,
+        accountEncCryptPrivKey,
+        accountEncSignPrivKey,
+        accountSignPubKey: accountSignKeyPair.pubKey
+      }
+    },
+
+    /**
+     * Generate and encrypt keypair for a document
+     */
     createDocument: async ({
       accountCryptPubKey
     }: {
@@ -95,6 +120,103 @@ export function makeClientCrypto(
       }
     },
 
+    /**
+     * Generate an encrypted document private key for the grantee
+     */
+    createGrant: async ({
+      granteeCryptPubKey,
+      documentEncCryptPrivKey
+    }: {
+      readonly granteeCryptPubKey: string
+      readonly documentEncCryptPrivKey: string
+    }) => {
+      const documentCryptPrivKey = await primitives.decrypt(
+        clientCryptKeyPair,
+        documentEncCryptPrivKey
+      )
+      const documentEncCryptPrivKeyForGrantee = await primitives.encrypt(
+        granteeCryptPubKey,
+        documentCryptPrivKey,
+        clientSignKeyPair
+      )
+      return { documentEncCryptPrivKeyForGrantee }
+    },
+
+    /**
+     * Generate and encrypt keypairs for a group
+     */
+    createGroup: async ({
+      accountCryptPubKey
+    }: {
+      readonly accountCryptPubKey: string
+    }) => {
+      const groupCryptKeyPair = await primitives.cryptKeyGen()
+      const groupSignKeyPair = await primitives.signKeyGen()
+
+      const groupEncCryptPrivKey = await primitives.encrypt(
+        accountCryptPubKey,
+        groupCryptKeyPair.privKey,
+        clientSignKeyPair
+      )
+
+      const groupEncSignPrivKey = await primitives.encrypt(
+        accountCryptPubKey,
+        groupSignKeyPair.privKey,
+        clientSignKeyPair
+      )
+
+      return {
+        groupCryptKeyPair,
+        groupEncCryptPrivKey,
+        groupEncSignPrivKey,
+        groupSignKeyPair
+      }
+    },
+
+    /**
+     * Generate transform key and optional encrypted private key for group member
+     */
+    createMembership: async ({
+      groupCryptPubKey,
+      groupEncCryptPrivKey,
+      memberCryptPubKey,
+      admin
+    }: {
+      readonly groupCryptPubKey: string
+      readonly groupEncCryptPrivKey: string
+      readonly memberCryptPubKey: string
+      readonly admin?: boolean
+    }) => {
+      const groupCryptPrivKey = await primitives.decrypt(
+        clientCryptKeyPair,
+        groupEncCryptPrivKey
+      )
+      const groupCryptKeyPair = {
+        privKey: groupCryptPrivKey,
+        pubKey: groupCryptPubKey
+      }
+      const memberCryptTransformKey = await primitives.cryptTransformKeyGen(
+        groupCryptKeyPair,
+        memberCryptPubKey,
+        clientSignKeyPair
+      )
+      const encCryptPrivKey = admin
+        ? await primitives.encrypt(
+            memberCryptPubKey,
+            groupCryptPrivKey,
+            clientSignKeyPair
+          )
+        : ''
+
+      return {
+        encCryptPrivKey,
+        memberCryptTransformKey
+      }
+    },
+
+    /**
+     * Decrypt a collection of ciphertexts from a given document
+     */
     decryptDocumentTexts: async ({
       ciphertexts,
       documentEncCryptPrivKey
@@ -102,78 +224,38 @@ export function makeClientCrypto(
       ciphertexts: readonly string[]
       documentEncCryptPrivKey: string
     }) => {
-      const cryptPrivKey = await clientCrypto.decryptKey(
+      const cryptPrivKey = await primitives.decrypt(
+        clientCryptKeyPair,
         documentEncCryptPrivKey
       )
 
-      return Promise.all(
-        ciphertexts.map(ciphertext => decrypt(ciphertext, cryptPrivKey))
-      )
+      return {
+        plaintexts: await Promise.all(
+          ciphertexts.map(ciphertext => decrypt(ciphertext, cryptPrivKey))
+        )
+      }
     },
 
-    decryptKey: (encKey: string) =>
-      primitives.decrypt(clientCryptKeyPair, encKey),
-
+    /**
+     * Encrypt a collection of ciphertexts for a given document
+     */
     encryptDocumentTexts: async ({
-      accountCryptPubKey,
-      documentCryptPubKey: passedCryptPubKey,
-      documentEncCryptPrivKey: passedEncCryptPrivKey,
+      documentEncCryptPrivKey,
       plaintexts
     }: {
-      readonly accountCryptPubKey: string
-      readonly documentCryptPubKey?: string
       readonly plaintexts: readonly string[]
-      readonly cryptPubKey?: string
       readonly documentEncCryptPrivKey: string
     }) => {
-      const {
-        documentEncCryptPrivKey,
-        documentCryptPubKey
-      } = await _getDocKeys({
-        accountCryptPubKey,
-        documentCryptPubKey: passedCryptPubKey,
-        documentEncCryptPrivKey: passedEncCryptPrivKey
-      })
-      const cryptPrivKey = await clientCrypto.decryptKey(
+      const cryptPrivKey = await primitives.decrypt(
+        clientCryptKeyPair,
         documentEncCryptPrivKey
       )
 
       return {
         ciphertexts: await Promise.all(
           plaintexts.map(plaintext => encrypt(plaintext, cryptPrivKey))
-        ),
-        documentCryptPubKey,
-        documentEncCryptPrivKey
+        )
       }
-    },
-
-    encryptKey: (pubKey: string, key: string) =>
-      primitives.encrypt(pubKey, key, clientSignKeyPair),
-
-    sign: (text: string) => primitives.sign(clientSignKeyPair, text)
-  }
-
-  async function _getDocKeys({
-    accountCryptPubKey,
-    documentCryptPubKey,
-    documentEncCryptPrivKey
-  }: {
-    accountCryptPubKey: string
-    documentCryptPubKey?: string
-    documentEncCryptPrivKey?: string
-  }): Promise<{
-    readonly documentCryptPubKey: string
-    readonly documentEncCryptPrivKey: string
-  }> {
-    if (documentEncCryptPrivKey && documentCryptPubKey) {
-      return {
-        documentCryptPubKey,
-        documentEncCryptPrivKey
-      }
-    } else {
-      return clientCrypto.createDocument({
-        accountCryptPubKey
-      })
     }
   }
 

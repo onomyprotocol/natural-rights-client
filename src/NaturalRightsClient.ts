@@ -31,6 +31,7 @@ import {
   NRSignDocumentResult,
   NRUpdateDocumentAction
 } from '@natural-rights/common'
+
 import {
   decrypt,
   encrypt,
