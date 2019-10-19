@@ -36,6 +36,11 @@ export class RemoteHttpService implements NRServiceInterface {
     if (httpResponse.status >= 300) {
       throw new Error('Bad HTTP Response')
     }
-    return httpResponse.json()
+    const json = await httpResponse.json()
+    /*console.log({
+      req,
+      res: json
+    })*/
+    return json
   }
 }

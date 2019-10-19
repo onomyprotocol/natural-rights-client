@@ -20,6 +20,13 @@ export function makeClientCrypto(
     clientCryptPubKey: clientCryptKeyPair.pubKey,
     clientSignPubKey: clientSignKeyPair.pubKey,
 
+    publicKeys: () => {
+      return {
+        clientCryptPubKey: clientCryptKeyPair.pubKey,
+        clientSignPubKey: clientSignKeyPair.pubKey
+      }
+    },
+
     /**
      * Sign one or more NRAction's with this account or client
      */
@@ -85,11 +92,18 @@ export function makeClientCrypto(
         clientSignKeyPair
       )
 
+      const clientCryptTransformKey = await primitives.cryptTransformKeyGen(
+        accountCryptKeyPair,
+        clientCryptKeyPair.pubKey,
+        accountSignKeyPair
+      )
+
       return {
         accountCryptPubKey: accountCryptKeyPair.pubKey,
         accountEncCryptPrivKey,
         accountEncSignPrivKey,
-        accountSignPubKey: accountSignKeyPair.pubKey
+        accountSignPubKey: accountSignKeyPair.pubKey,
+        clientCryptTransformKey
       }
     },
 
@@ -165,11 +179,18 @@ export function makeClientCrypto(
         clientSignKeyPair
       )
 
-      return {
+      const memberCryptTransformKey = await primitives.cryptTransformKeyGen(
         groupCryptKeyPair,
+        accountCryptPubKey,
+        groupSignKeyPair
+      )
+
+      return {
+        groupCryptPubKey: groupCryptKeyPair.pubKey,
         groupEncCryptPrivKey,
         groupEncSignPrivKey,
-        groupSignKeyPair
+        groupSignPubKey: groupSignKeyPair.pubKey,
+        memberCryptTransformKey
       }
     },
 
